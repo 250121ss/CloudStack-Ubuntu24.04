@@ -1,0 +1,104 @@
+################  Prerequisites ########################################33
+
+Ensure your system meets the following requirements:
+
+    OS: Ubuntu 24.04
+    RAM: Minimum 4 GB
+    Disk: Minimum 20 GB free space
+    Processor: 64-bit
+
+################ Update System Packages ###################################
+
+sudo apt update && sudo apt upgrade -y
+
+#################  Install Required Packages  #############################
+
+sudo apt install openjdk-11-jdk mariadb-server qemu-kvm libvirt-daemon-system \
+libvirt-clients bridge-utils nfs-common python3-pip uuid-runtime -y
+
+issue :  sudo apt clean  , sudo apt update , sudo apt install -y --fix-missing ovmf
+
+
+################  Configure MariaDB #######################################
+
+sudo mysql_secure_installation
+
+sudo mysql -u root -p
+
+CREATE DATABASE cloud;
+CREATE USER 'cloud'@'%' IDENTIFIED BY 'cloud-password';
+GRANT ALL PRIVILEGES ON cloud.* TO 'cloud'@'%';
+FLUSH PRIVILEGES;
+EXIT;
+
+----Edit MariaDB configuration:  --- 
+
+Add or modify the following under [mysqld]:
+
+sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf
+
+
+innodb_rollback_on_timeout=1
+innodb_lock_wait_timeout=600
+max_connections=350
+log-bin=mysql-bin
+binlog-format = 'ROW'
+
+
+sudo systemctl restart mariadb
+
+##################### Install Apache CloudStack ######################################
+
+sudo nano /etc/apt/sources.list.d/cloudstack.list
+
+-------------- Add the Repository: Add the following line to the file:
+
+deb http://download.cloudstack.org/ubuntu focal 4.17
+
+----  Add the Public Key: ----------------
+
+wget -O - http://download.cloudstack.org/release.asc | sudo apt-key add -
+
+sudo apt-get update
+
+sudo apt install cloudstack-management -y
+
+########################  Configure CloudStack ##########################################
+
+---- Set up the database:  ---
+
+sudo cloudstack-setup-databases cloud:cloud-password@localhost --deploy-as=root:<root-password>
+
+sudo cloudstack-setup-management
+
+############################  Configure NFS Storage  ########################################
+
+sudo apt install nfs-kernel-server -y
+
+-----------  Configure NFS exports: ----
+
+sudo nano /etc/exports
+
+Add the following lines:  -------------
+
+/export/primary *(rw,async,no_root_squash)
+/export/secondary *(rw,async,no_root_squash)
+
+--------------   Create directories and restart the NFS service:  =--------
+
+sudo mkdir -p /export/primary /export/secondary
+sudo chmod -R 777 /export/primary /export/secondary
+sudo exportfs -a
+sudo systemctl restart nfs-server
+
+###########################  Access CloudStack UI  #################333
+
+http://<your-server-ip>:8080/client
+
+
+Username: admin
+Password: password
+
+
+
+
